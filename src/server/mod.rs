@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::net::ToSocketAddrs;
 use std::io::{self};
 
-use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::runtime;
 
@@ -14,7 +13,9 @@ use log_manager::LogManager;
 mod rsa_manager;
 use rsa_manager::RsaManager;
 pub mod login_client;
-use login_client::{LoginClient, LoginClientSignalingInfo};
+use login_client::LoginClient;
+
+use tracing::{debug, error, info, span, trace, warn, Level};
 
 pub struct Server {
     config: Arc<RwLock<Config>>,
@@ -41,6 +42,7 @@ impl Server {
 
     pub fn start(&mut self) -> Result<(), std::io::Error> {
         
+        info!("Starting server");
         self.log("Starting server instance");
 
         // Parse host address
@@ -52,7 +54,7 @@ impl Server {
 
 
         // Setup Tokio
-        let mut runtime = runtime::Builder::new_multi_thread()
+        let runtime = runtime::Builder::new_multi_thread()
         .enable_io()
         .build()?;
         

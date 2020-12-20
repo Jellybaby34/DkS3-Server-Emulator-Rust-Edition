@@ -8,6 +8,8 @@ use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
+
+
 use crate::Config;
 use crate::server::RsaManager;
 use crate::server::LogManager;
@@ -104,10 +106,13 @@ impl LoginClient {
                         self.log("Disconnecting");
                         break;
                     }
-                    let testing = &payload_data[0..payload_length];
+
+                    // The rust OpenSSL bindings don't let you pass buffer length
+                    // so we need to slice the buffer so that it's the expected size
+                    let payload_data_slice = &payload_data[0..payload_length];
 
                     let mut payload_decrypted: [u8; 2000] = [0; 2000];
-                    let payload_length_decrypted = self.rsa_manager.read().rsa_decrypt( &testing, &mut payload_decrypted);
+                    let payload_length_decrypted = self.rsa_manager.read().rsa_decrypt( &payload_data_slice, &mut payload_decrypted);
 
                     let mut s = String::new();
                     for i in 0..payload_length_decrypted {
@@ -135,7 +140,7 @@ impl LoginClient {
         let total_packet_length: u32 = (header_length+payload_length) as u32;
         // Total packet length - 2 in big endian
         let packet_length_1_be: u16 = u16::from_be_bytes([header_data[0], header_data[1]]);
-        if packet_length_1_be != (total_packet_length-2) as u16{
+        if packet_length_1_be != (total_packet_length-2) as u16 {
             self.log("Packet length #1 was incorrect");
             return Err(());
         }

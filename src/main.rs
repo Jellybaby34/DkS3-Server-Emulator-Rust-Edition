@@ -3,14 +3,13 @@ extern crate config;
 mod server;
 use server::Server;
 
-//use std::collections::HashMap;
+use tracing::{error, info};
 
 pub struct Config {
     server_ip: String,
     login_port: u16,
     auth_port: u16,
     game_port: u16,
-    rsa_public_key: String,
     rsa_private_key: String
 }
 
@@ -21,7 +20,6 @@ impl Config {
             login_port: config_file.get_int("login_port").expect("Could not read login_port from config file") as u16,
             auth_port: config_file.get_int("auth_port").expect("Could not read auth_port from config file") as u16,
             game_port: config_file.get_int("game_port").expect("Could not read game_port from config file") as u16,
-            rsa_public_key: config_file.get_str("rsa_public_key").expect("Could not read rsa_public_key from config file"),
             rsa_private_key: config_file.get_str("rsa_private_key").expect("Could not read rsa_private_key from config file")
         }
     }
@@ -42,19 +40,24 @@ impl Config {
         return self.game_port;
     }
 
-    pub fn get_rsa_public_key(&self) -> &String {
-        return &self.rsa_public_key;
-    }
-
     pub fn get_rsa_private_key(&self) -> &String {
         return &self.rsa_private_key;
     }
 }
 
 fn main() {
-    println!("[main] Starting Dark Souls 3 Server Emulator");
-    println!("[main] Written by /u/TheSpicyChef");
-    println!("[main] Don't expect perfection because i've never used rust before :lmao:");
+
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+    .with_max_level(tracing::Level::TRACE)
+    .without_time()
+    .with_target(true)
+    .with_ansi(true)
+    .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed!");
+
+    info!("Starting Dark Souls 3 Server Emulator");
+    info!("Written by /u/TheSpicyChef");
+    info!("Don't expect perfection because i've never used rust before :lmao:");
 
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
@@ -63,9 +66,9 @@ fn main() {
     let mut server_inst = Server::new(config_inst);
     
     if let Err(e) = server_inst.start() {
-        println!("Server terminated with error: {}", e);
+        error!("Server terminated with error: {}", e);
     } else {
-        println!("Server terminated normally");
+        error!("Server terminated normally");
     }
-
+    
 }
