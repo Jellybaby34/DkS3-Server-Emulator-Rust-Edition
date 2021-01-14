@@ -1,9 +1,9 @@
 extern crate config;
 
-mod server;
-use server::Server;
-
 use tracing::{error, info};
+
+mod server;
+use server::ServerMaster;
 
 pub struct Config {
     server_ip: String,
@@ -46,7 +46,8 @@ impl Config {
 }
 
 fn main() {
-
+    // Set up logging things
+    // Should really add the module that logs to file
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
     .with_max_level(tracing::Level::TRACE)
     .without_time()
@@ -59,13 +60,19 @@ fn main() {
     info!("Written by /u/TheSpicyChef");
     info!("Don't expect perfection because i've never used rust before :lmao:");
 
+    // Read config settings from the "Settings.toml" file
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
     let config_inst = Config::new(settings);
 
-    let mut server_inst = Server::new(config_inst);
-    
-    if let Err(e) = server_inst.start() {
+    // Create our "ServerMaster" instance that will start and handle the other instances
+    let server_inst = ServerMaster::new(config_inst);
+
+    // Start the ServerMaster and block on it.
+    let tokio = server_inst.tokio_runtime.clone();
+    let res = tokio.block_on(server_inst.start());
+
+    if let Err(e) = res {
         error!("Server terminated with error: {}", e);
     } else {
         error!("Server terminated normally");
