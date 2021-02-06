@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
 use tracing::{debug, error, info, span, trace, warn, Level};
 
-use dks3_proto::frame::FrameDecoder;
+use dks3_proto::frame::{Frame, FrameDecoder};
 use dks3_proto::msg::frpg2_request;
 use dks3_proto::msg::frpg2_request::RequestQueryLoginServerInfoResponse;
 use frpg2_request::RequestQueryLoginServerInfo;
@@ -36,6 +36,8 @@ pub struct LoginClientInfo {
 
 pub struct LoginClient {
     connection: Connection,
+    global_counter: u16,
+    counter: u32,
     config: Arc<RwLock<Config>>,
     rsa_manager: Arc<RwLock<RsaManager>>,
     client_info: LoginClientInfo,
@@ -58,7 +60,29 @@ impl LoginClientSignalingInfo {
 }
 
 impl LoginClient {
-    pub async fn write_message<M: Message>(&mut self, message: M) {}
+    pub async fn write_message<M: Message>(&mut self, message: M) {
+        let message_len = message.encoded_len();
+        let mut message_data = BytesMut::with_capacity(message_len);
+
+        message.encode(&mut message_data);
+
+        let mut message_encrypted = BytesMut::new();
+        message_encrypted.reserve(1024);
+
+        let message_encrypted_len = self
+            .rsa_manager
+            .read()
+            .rsa_encrypt(&message_data, &mut message_encrypted);
+        message_encrypted.truncate(message_encrypted_len);
+
+        self.connection
+            .write_frame(Frame::new(
+                self.global_counter,
+                self.counter,
+                message_encrypted,
+            ))
+            .await;
+    }
 
     pub async fn read_message<M: Message + Default>(&mut self) -> M {
         let frame = self.connection.read_frame().await.unwrap();
@@ -73,6 +97,9 @@ impl LoginClient {
 
         payload_decrypted.truncate(payload_length_decrypted);
         let msg = M::decode(payload_decrypted).unwrap(); // TODO: handle error
+
+        self.global_counter = frame.global_counter;
+        self.counter = frame.counter;
 
         msg
     }
@@ -95,6 +122,8 @@ impl LoginClient {
 
         LoginClient {
             connection,
+            global_counter: 0,
+            counter: 0,
             config,
             rsa_manager,
             client_info,
@@ -113,5 +142,7 @@ impl LoginClient {
         let mut server_info: RequestQueryLoginServerInfoResponse = Default::default();
         server_info.serverip = self.config.read().get_server_ip().to_string();
         server_info.port = self.config.read().get_auth_port() as i64;
+
+        self.write_message(server_info).await;
     }
 }

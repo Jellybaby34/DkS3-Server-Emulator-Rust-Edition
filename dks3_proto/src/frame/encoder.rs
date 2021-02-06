@@ -22,6 +22,14 @@ pub enum FrameEncoderError {
     },
 }
 
+impl FrameEncoder {
+    pub fn new(has_128b_trailer: bool) -> Self {
+        FrameEncoder {
+            has_128b_trailer
+        }
+    }
+}
+
 impl Encoder<Frame> for FrameEncoder {
     type Error = FrameEncoderError;
 

@@ -14,3 +14,12 @@ pub struct Frame {
     pub data: BytesMut,
 }
 
+impl Frame {
+    pub fn new(global_counter: u16, counter: u32, data: BytesMut) -> Self {
+        Self {
+            global_counter,
+            counter,
+            data,
+        }
+    }
+}
