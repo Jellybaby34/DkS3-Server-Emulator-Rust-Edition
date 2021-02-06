@@ -187,6 +187,7 @@ dependencies = [
  "prost-build",
  "thiserror",
  "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -343,6 +344,13 @@ checksum = "501466ecc8a30d1d3b7fc9229b122b2ce8ed6e9d9223f1138d4babb253e51817"
 dependencies = [
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "genrsa"
+version = "0.1.0"
+dependencies = [
+ "openssl",
 ]
 
 [[package]]

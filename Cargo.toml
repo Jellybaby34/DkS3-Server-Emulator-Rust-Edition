@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "dks3_proto",
-    "dks3_server"
+    "dks3_server",
+    "tools/genrsa"
 ]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

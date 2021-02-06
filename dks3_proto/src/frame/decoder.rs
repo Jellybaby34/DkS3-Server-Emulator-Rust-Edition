@@ -52,7 +52,6 @@ impl FrameDecoder {
         &mut self,
         src: &mut BytesMut,
     ) -> Result<Option<(usize, u16, u32)>, FrameDecoderError> {
-        info!("Decoding header");
         let header_size = if self.has_128b_trailer {
             super::LOGIN_HEADER_SIZE + 16
         } else {
@@ -102,7 +101,6 @@ impl Decoder for FrameDecoder {
     type Error = FrameDecoderError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        info!("Decoding frame");
         let (length, global_counter, counter) = match self.state {
             FrameDecoderState::Header => match self.decode_header(src)? {
                 Some((length, global_counter, counter)) => {

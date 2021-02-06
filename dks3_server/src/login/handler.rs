@@ -21,7 +21,6 @@ pub struct LoginConnectionHandler {
     global_counter: u16,
     counter: u32,
     config: Config,
-    rsa_manager: RsaManager,
 }
 
 impl LoginConnectionHandler {
@@ -56,7 +55,6 @@ impl LoginConnectionHandler {
             global_counter: 0,
             counter: 0,
             config,
-            rsa_manager,
         }
     }
 
@@ -66,13 +64,13 @@ impl LoginConnectionHandler {
         /* Could check steam ID, versionnum, etc. here */
         info!(steamid = %server_info_req.steamid, version = %server_info_req.versionnum, "Client connected");
 
-        let server_info = RequestQueryLoginServerInfoResponse {
-            serverip: self.config.get_server_ip().to_string(),
-            port: self.config.get_auth_port() as i64,
-        };
+        let mut server_info = RequestQueryLoginServerInfoResponse::default();
+        server_info.serverip = self.config.get_server_ip().to_string();
+        server_info.port = 50000;
 
         self.write_message(server_info).await;
 
+        // TODO: fix this so it can wait until all channels are flushed
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
