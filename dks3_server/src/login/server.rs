@@ -58,52 +58,13 @@ impl LoginServer {
             info!("New client from {}", peer_addr);
 
             let config = self.config.clone();
-            let rsa_client = self.rsa_manager.clone();
 
             tokio::spawn(async move {
-                let mut client = LoginConnectionHandler::new(stream, config, rsa_client);
+                let mut client = LoginConnectionHandler::new(stream, config);
 
-                client.run().await;
+                client.await.run().await;
                 Ok(()) as io::Result<()>
             });
         }
     }
 }
-
-/*
-
-        let fut_server = async move {
-
-            let listener = TcpListener::bind(&addr).await.map_err(|e| io::Error::new(e.kind(), format!("Error binding to <{}>: {}", &addr, e))).unwrap();
-            self.log(&format!("Now waiting for connections on <{}>", &addr));
-
-            loop {
-                let accept_result = listener.accept().await;
-                if let Err(e) = accept_result {
-                    self.log(&format!("Accept failed with: {}", e));
-                    continue;
-                }
-
-                let (stream, peer_addr) = accept_result.unwrap();
-//                stream.set_keepalive(Some(std::time::Duration::new(30, 0))).unwrap();
-                self.log(&format!("New client from {}", peer_addr));
-
-                let config = self.config.clone();
-                let rsa_client = self.rsa_manager.clone();
-                let log_client = self.log_manager.clone();
-
-                let fut_client = async move {
-//                    let payload = b"Lmao";
-//                    let mut payload_buffer: [u8; 256] = [0; 256];
-//                    rsa_client.read().rsa_encrypt(payload, &mut payload_buffer);
-//                    stream_example.write(&payload_buffer).await?;
-                    let mut client = LoginClient::new(peer_addr, stream, config, rsa_client, log_client).await;
-                    client.process().await;
-                    Ok(()) as io::Result<()>
-                };
-
-                runtime.spawn(fut_client);
-            }
-
-        };
-*/

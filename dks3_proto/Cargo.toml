@@ -11,7 +11,7 @@ cwc = { git = "https://github.com/garyttierney/ds3-open-re" }
 openssl = { version = "0.10.32" }
 prost = "0.7"
 thiserror = "1.0"
-
+tracing = "0.1"
 [dependencies.tokio-util]
 version = "0.6.3"
 features = ["codec"]

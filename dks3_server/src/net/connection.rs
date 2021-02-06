@@ -1,27 +1,26 @@
-use futures::SinkExt;
-use tokio::io::{AsyncRead, AsyncWrite};
+use futures::{SinkExt, TryStreamExt};
+use tokio::io::{split, AsyncRead, AsyncWrite};
 use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
+use tracing::info;
 
 use dks3_proto::frame::{CipherMode, Frame, FrameDecoder, FrameEncoder};
+use std::fmt::Debug;
 
 pub struct Connection {
     close_tx: broadcast::Sender<()>,
     cipher_change_tx: mpsc::Sender<CipherMode>,
     inbound_frame_rx: mpsc::Receiver<Frame>,
     outbound_frame_tx: mpsc::Sender<Frame>,
+    handle: JoinHandle<()>,
 }
 
 impl Connection {
-    pub fn start<Read, Write>(
-        cipher_pair: (CipherMode, CipherMode),
-        reader: Read,
-        writer: Write,
-    ) -> Connection
+    pub fn start<Read>(cipher_pair: (CipherMode, CipherMode), stream: Read) -> Connection
     where
-        Read: AsyncRead + Unpin + Send + 'static,
-        Write: AsyncWrite + Unpin + Send + 'static,
+        Read: AsyncRead + AsyncWrite + Unpin + Send + Debug + 'static,
     {
         let (close_tx, mut close_rx) = broadcast::channel::<()>(1);
         let (cipher_change_tx, mut cipher_change_rx) = mpsc::channel::<CipherMode>(1);
@@ -29,10 +28,13 @@ impl Connection {
         let (inbound_frame_tx, inbound_frame_rx) = mpsc::channel::<Frame>(10);
         let (inbound_cipher, outbound_cipher) = cipher_pair;
 
-        let mut frame_reader = FramedRead::new(reader, FrameDecoder::new(inbound_cipher, false));
-        let mut frame_writer = FramedWrite::new(writer, FrameEncoder::new(outbound_cipher, true));
+        let handle = tokio::spawn(async move {
+            let (mut stream_reader, mut stream_writer) = split(stream);
+            let mut frame_reader =
+                FramedRead::new(&mut stream_reader, FrameDecoder::new(inbound_cipher, false));
+            let mut frame_writer =
+                FramedWrite::new(&mut stream_writer, FrameEncoder::new(outbound_cipher, true));
 
-        let _io_task = tokio::spawn(async move {
             loop {
                 tokio::select! {
                     cipher = cipher_change_rx.recv() => {
@@ -45,14 +47,26 @@ impl Connection {
                             Some(Ok(frame)) => {
                                 let _ = inbound_frame_tx.send(frame).await;
                             },
-                            _ => break
+                            Some(Err(error)) => {
+                                tracing::error!(error = %error, "error while reading frame");
+                                break;
+                            }
+                            None => {
+                                info!("connection was closed");
+                                break;
+                            }
                         }
                     }
                     outbound_frame = outbound_frame_rx.recv() => {
-                        // TODO: handle result and close connection
-                        let _ = frame_writer.send(outbound_frame.unwrap()).await;
+                        match outbound_frame {
+                            Some(frame) => {
+                                let _ = frame_writer.send(frame).await;
+                            }
+                            None => break
+                        }
                     }
                     _ = close_rx.recv() => {
+                        info!("received close signal");
                         break;
                     }
                 }
@@ -61,6 +75,7 @@ impl Connection {
 
         Connection {
             close_tx,
+            handle,
             cipher_change_tx,
             inbound_frame_rx,
             outbound_frame_tx,

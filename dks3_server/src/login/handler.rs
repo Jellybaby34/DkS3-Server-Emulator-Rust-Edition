@@ -14,6 +14,7 @@ use frpg2_request::RequestQueryLoginServerInfo;
 use crate::net::{CipherMode, Connection};
 use crate::server::RsaManager;
 use crate::Config;
+use std::time::Duration;
 
 pub struct LoginConnectionHandler {
     connection: Connection,
@@ -43,17 +44,12 @@ impl LoginConnectionHandler {
         msg
     }
 
-    pub fn new(
-        stream: TcpStream,
-        config: Config,
-        rsa_manager: RsaManager,
-    ) -> LoginConnectionHandler {
+    pub async fn new(stream: TcpStream, config: Config) -> LoginConnectionHandler {
         let inbound_cipher_mode = CipherMode::rsa_pkcs1_oeap(config.rsa_private_key.as_bytes());
         let outbound_cipher_mode = CipherMode::rsa_x931(config.rsa_private_key.as_bytes());
 
-        let (stream_reader, stream_writer) = io::split(stream);
         let ciphers = (inbound_cipher_mode, outbound_cipher_mode);
-        let connection = Connection::start(ciphers, stream_reader, stream_writer);
+        let connection = Connection::start(ciphers, stream);
 
         LoginConnectionHandler {
             connection,
@@ -68,7 +64,7 @@ impl LoginConnectionHandler {
         let server_info_req = self.read_message::<RequestQueryLoginServerInfo>().await;
 
         /* Could check steam ID, versionnum, etc. here */
-        info!(steamid = %server_info_req.steamid, "Client connected");
+        info!(steamid = %server_info_req.steamid, version = %server_info_req.versionnum, "Client connected");
 
         let server_info = RequestQueryLoginServerInfoResponse {
             serverip: self.config.get_server_ip().to_string(),
@@ -76,5 +72,7 @@ impl LoginConnectionHandler {
         };
 
         self.write_message(server_info).await;
+
+        tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }

@@ -47,12 +47,8 @@ impl Encoder<Frame> for FrameEncoder {
             super::LOGIN_HEADER_SIZE
         };
 
-        let data_len: u16 = item
-            .data
-            .len()
-            .try_into()
-            .map_err(|_| FrameEncoderError::InvalidSize)?;
-        let total_len = data_len + header_size as u16;
+        let encrypted_data = crypto::encrypt(&self.cipher_mode, &item.data).unwrap();
+        let total_len = (encrypted_data.len() + header_size) as u16;
 
         dst.put_u16(total_len - 2);
         dst.put_u16(item.global_counter);
@@ -60,15 +56,17 @@ impl Encoder<Frame> for FrameEncoder {
 
         dst.put_u32(total_len as u32 - 14);
         dst.put_u32(total_len as u32 - 14);
-        dst.put_u32(0); // unk2
+        dst.put_u32(0x0c); // unk2
         dst.put_u32(0); // unk3
         dst.put_u32_le(item.counter);
 
         if self.has_128b_trailer {
-            dst.put_u128(0);
+            dst.put_u32(0);
+            dst.put_u32(1);
+            dst.put_u32(0);
+            dst.put_u32(0);
         }
 
-        let encrypted_data = crypto::encrypt(&self.cipher_mode, &item.data);
         dst.put(&encrypted_data[..]);
 
         Ok(())
