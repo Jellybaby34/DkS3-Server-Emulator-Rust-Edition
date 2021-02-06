@@ -1,11 +1,7 @@
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::{Buf, BytesMut};
 use thiserror::Error;
 use tokio_util::codec::Decoder;
 use crate::frame::Frame;
-use crate::frame::encoder::FrameEncoderError;
 
 #[derive(Debug, Error)]
 pub enum FrameDecoderError {
@@ -22,7 +18,6 @@ pub enum FrameDecoderError {
     },
 }
 
-pub const LOGIN_HEADER_SIZE: usize = 26;
 
 pub enum FrameDecoderState {
     Header,
@@ -49,9 +44,9 @@ impl FrameDecoder {
 
     fn decode_header(&mut self, src: &mut BytesMut) -> Result<Option<(usize, u16, u32)>, FrameDecoderError> {
         let header_size = if self.has_128b_trailer {
-            LOGIN_HEADER_SIZE + 16
+            super::LOGIN_HEADER_SIZE + 16
         } else {
-            LOGIN_HEADER_SIZE
+            super::LOGIN_HEADER_SIZE
         };
 
         if src.len() < header_size {
@@ -78,7 +73,7 @@ impl FrameDecoder {
             src.advance(16);
         }
 
-        Ok(Some((packet_length as usize + 2, global_counter, counter)))
+        Ok(Some((packet_length as usize + 2 - header_size, global_counter, counter)))
     }
 }
 

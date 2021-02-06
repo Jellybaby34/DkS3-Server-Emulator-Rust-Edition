@@ -3,7 +3,10 @@ use bytes::BytesMut;
 mod decoder;
 mod encoder;
 
-pub use decoder::FrameDecoder;
+pub use decoder::{FrameDecoder, FrameDecoderError};
+pub use encoder::{FrameEncoder, FrameEncoderError};
+
+pub(crate) const LOGIN_HEADER_SIZE: usize = 26;
 
 pub struct Frame {
     pub global_counter: u16,
