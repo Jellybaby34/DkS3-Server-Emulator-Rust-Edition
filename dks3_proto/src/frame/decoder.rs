@@ -1,12 +1,14 @@
 use bytes::{Buf, BytesMut};
 use thiserror::Error;
 use tokio_util::codec::Decoder;
-use crate::frame::Frame;
+
+use crate::frame::crypto::CipherMode;
+use crate::frame::{crypto, Frame};
 
 #[derive(Debug, Error)]
 pub enum FrameDecoderError {
-    #[error("frame would produce invalid data when read")]
-    InvalidData,
+    #[error("frame contained an invalid ciphertext")]
+    InvalidCiphertext,
 
     #[error("frame header has mismatched packet size fields")]
     InvalidSize,
@@ -18,7 +20,6 @@ pub enum FrameDecoderError {
     },
 }
 
-
 pub enum FrameDecoderState {
     Header,
     Data {
@@ -29,20 +30,25 @@ pub enum FrameDecoderState {
 }
 
 pub struct FrameDecoder {
+    cipher_mode: CipherMode,
     // If [LoginFrame]s decoded by this codec have 128 bits of zeroes trailing on the header.
     has_128b_trailer: bool,
     state: FrameDecoderState,
 }
 
 impl FrameDecoder {
-    pub fn new(has_128b_trailer: bool) -> Self {
+    pub fn new(cipher_mode: CipherMode, has_128b_trailer: bool) -> Self {
         Self {
+            cipher_mode,
             has_128b_trailer,
-            state: FrameDecoderState::Header
+            state: FrameDecoderState::Header,
         }
     }
 
-    fn decode_header(&mut self, src: &mut BytesMut) -> Result<Option<(usize, u16, u32)>, FrameDecoderError> {
+    fn decode_header(
+        &mut self,
+        src: &mut BytesMut,
+    ) -> Result<Option<(usize, u16, u32)>, FrameDecoderError> {
         let header_size = if self.has_128b_trailer {
             super::LOGIN_HEADER_SIZE + 16
         } else {
@@ -61,7 +67,9 @@ impl FrameDecoder {
         let packet_length_u32_a = src.get_u32();
         let packet_length_u32_b = src.get_u32();
 
-        if packet_length as u32 + 2 != packet_length_u32_a + 14 || packet_length as u32 + 2 != packet_length_u32_b + 14 {
+        if packet_length as u32 + 2 != packet_length_u32_a + 14
+            || packet_length as u32 + 2 != packet_length_u32_b + 14
+        {
             return Err(FrameDecoderError::InvalidSize);
         }
 
@@ -73,7 +81,15 @@ impl FrameDecoder {
             src.advance(16);
         }
 
-        Ok(Some((packet_length as usize + 2 - header_size, global_counter, counter)))
+        Ok(Some((
+            packet_length as usize + 2 - header_size,
+            global_counter,
+            counter,
+        )))
+    }
+
+    pub fn set_cipher_mode(&mut self, cipher_mode: CipherMode) {
+        self.cipher_mode = cipher_mode;
     }
 }
 
@@ -85,12 +101,20 @@ impl Decoder for FrameDecoder {
         let (length, global_counter, counter) = match self.state {
             FrameDecoderState::Header => match self.decode_header(src)? {
                 Some((length, global_counter, counter)) => {
-                    self.state = FrameDecoderState::Data { length, global_counter, counter };
+                    self.state = FrameDecoderState::Data {
+                        length,
+                        global_counter,
+                        counter,
+                    };
                     (length, global_counter, counter)
                 }
                 None => return Ok(None),
             },
-            FrameDecoderState::Data { length, global_counter, counter } => (length, global_counter, counter),
+            FrameDecoderState::Data {
+                length,
+                global_counter,
+                counter,
+            } => (length, global_counter, counter),
         };
 
         if src.len() < length as usize {
@@ -99,10 +123,14 @@ impl Decoder for FrameDecoder {
 
         self.state = FrameDecoderState::Header;
 
+        let data = src.split_to(length);
+        let decrypted_data = crypto::decrypt(&self.cipher_mode, &data)
+            .map_err(|_| FrameDecoderError::InvalidCiphertext)?;
+
         Ok(Some(Frame {
             counter,
             global_counter,
-            data: src.split_to(length),
+            data: decrypted_data,
         }))
     }
 }

@@ -4,10 +4,12 @@ use bytes::{BufMut, BytesMut};
 use thiserror::Error;
 use tokio_util::codec::Encoder;
 
+use crate::frame::crypto::{self, CipherMode};
 use crate::frame::Frame;
 
 pub struct FrameEncoder {
-    has_128b_trailer: bool
+    cipher_mode: CipherMode,
+    has_128b_trailer: bool,
 }
 
 #[derive(Debug, Error)]
@@ -23,10 +25,15 @@ pub enum FrameEncoderError {
 }
 
 impl FrameEncoder {
-    pub fn new(has_128b_trailer: bool) -> Self {
+    pub fn new(cipher_mode: CipherMode, has_128b_trailer: bool) -> Self {
         FrameEncoder {
-            has_128b_trailer
+            cipher_mode,
+            has_128b_trailer,
         }
+    }
+
+    pub fn set_cipher_mode(&mut self, cipher_mode: CipherMode) {
+        self.cipher_mode = cipher_mode;
     }
 }
 
@@ -40,7 +47,11 @@ impl Encoder<Frame> for FrameEncoder {
             super::LOGIN_HEADER_SIZE
         };
 
-        let data_len: u16 = item.data.len().try_into().map_err(|_| FrameEncoderError::InvalidSize)?;
+        let data_len: u16 = item
+            .data
+            .len()
+            .try_into()
+            .map_err(|_| FrameEncoderError::InvalidSize)?;
         let total_len = data_len + header_size as u16;
 
         dst.put_u16(total_len - 2);
@@ -57,7 +68,8 @@ impl Encoder<Frame> for FrameEncoder {
             dst.put_u128(0);
         }
 
-        dst.put(item.data);
+        let encrypted_data = crypto::encrypt(&self.cipher_mode, &item.data);
+        dst.put(&encrypted_data[..]);
 
         Ok(())
     }

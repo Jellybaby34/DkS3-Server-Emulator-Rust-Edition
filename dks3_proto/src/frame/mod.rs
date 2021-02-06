@@ -1,10 +1,12 @@
 use bytes::BytesMut;
 
-mod decoder;
-mod encoder;
-
+pub use crypto::CipherMode;
 pub use decoder::{FrameDecoder, FrameDecoderError};
 pub use encoder::{FrameEncoder, FrameEncoderError};
+
+mod crypto;
+mod decoder;
+mod encoder;
 
 pub(crate) const LOGIN_HEADER_SIZE: usize = 26;
 
