@@ -3,6 +3,7 @@ extern crate config;
 use tracing::{error, info};
 
 mod server;
+
 use server::ServerMaster;
 
 pub struct Config {
@@ -10,7 +11,7 @@ pub struct Config {
     login_port: u16,
     auth_port: u16,
     game_port: u16,
-    rsa_private_key: String
+    rsa_private_key: String,
 }
 
 impl Config {
@@ -20,7 +21,7 @@ impl Config {
             login_port: config_file.get_int("login_port").expect("Could not read login_port from config file") as u16,
             auth_port: config_file.get_int("auth_port").expect("Could not read auth_port from config file") as u16,
             game_port: config_file.get_int("game_port").expect("Could not read game_port from config file") as u16,
-            rsa_private_key: config_file.get_str("rsa_private_key").expect("Could not read rsa_private_key from config file")
+            rsa_private_key: config_file.get_str("rsa_private_key").expect("Could not read rsa_private_key from config file"),
         }
     }
 
@@ -49,11 +50,11 @@ fn main() {
     // Set up logging things
     // Should really add the module that logs to file
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
-    .with_max_level(tracing::Level::TRACE)
-    .without_time()
-    .with_target(true)
-    .with_ansi(true)
-    .finish();
+        .with_max_level(tracing::Level::TRACE)
+        .without_time()
+        .with_target(true)
+        .with_ansi(true)
+        .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed!");
 
     info!("Starting Dark Souls 3 Server Emulator");
@@ -77,5 +78,5 @@ fn main() {
     } else {
         error!("Server terminated normally");
     }
-    
+
 }

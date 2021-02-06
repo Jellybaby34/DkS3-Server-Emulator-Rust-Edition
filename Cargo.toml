@@ -1,21 +1,6 @@
-[package]
-name = "dks3_server_emulator_rust"
-version = "0.1.0"
-authors = ["Jellybaby34 <Jellybaby34@users.noreply.github.com>"]
-edition = "2018"
-
+[workspace]
+members = [
+    "dks3_proto",
+    "dks3_server"
+]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-config = "0.10"
-openssl = "0.10.32"
-tokio = { version = "1.0.0", features = ["full"] }
-parking_lot = "0.11"
-chrono = "0.4"
-bytes = "1.0.0"
-tracing = "0.1.22"
-tracing-subscriber = "0.2.15"
-prost = { git = "https://github.com/danburkert/prost" }
-
-[build-dependencies]
-prost-build = { version = "0.6.1" }

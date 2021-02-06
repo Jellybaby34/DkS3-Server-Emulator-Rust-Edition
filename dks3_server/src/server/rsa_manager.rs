@@ -26,7 +26,7 @@ impl RsaManager {
     pub fn rsa_encrypt(&self, from: &[u8], to: &mut [u8]) -> usize {
         // RSA_X931_PADDING is used by the server, it isn't exposed in the rust openssl so we use a raw value to access it
         // I also can't be bothered to make a pull request or a fork
-        let length = self.rsa_priv_key_inst.private_encrypt( from, to, Padding::from_raw(5)).unwrap(); 
+        let length = self.rsa_priv_key_inst.private_encrypt( from, to, Padding::from_raw(5)).unwrap();
         return length;
     }
 

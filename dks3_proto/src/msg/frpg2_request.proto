@@ -1,9 +1,9 @@
-/* All messages are as From Soft named them in DkS3 */
-
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-package Frpg2RequestMessage;
+package dks3.frpg2_request;
+
+import "common.proto";
 
 message RequestQueryLoginServerInfo {
   required string steamid = 1;
@@ -33,6 +33,24 @@ message GetServiceStatus {
 message GetServiceStatusResponse {
   required int64 id = 1;
   required string steamid = 2;
-  required int64 unknownfield = 3; 
+  required int64 unknownfield = 3;
   required int64 versionnum = 4;
+}
+
+message RequestGetAnnounceMessageListResponse {
+  required AnnounceMessageDataList items = 1;
+}
+
+message AnnounceMessageDataList {
+  repeated AnnounceMessageData changes = 1;
+  repeated AnnounceMessageData notices = 2;
+}
+
+message AnnounceMessageData {
+  required uint32 unk01 = 1;
+  required uint32 unk02 = 2;
+  required uint32 unk03 = 3;
+  required string header = 4;
+  required string message = 5;
+  required dks3.common.DateTime date_time = 6;
 }

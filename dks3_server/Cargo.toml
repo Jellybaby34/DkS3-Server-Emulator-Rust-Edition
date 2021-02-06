@@ -1,0 +1,24 @@
+[package]
+name = "dks3_server"
+version = "0.1.0"
+authors = ["Gary Tierney <gary.tierney@fastmail.com>", "Jellybaby34 <Jellybaby34@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+config = "0.10"
+dks3_proto = { path = "../dks3_proto" }
+openssl = { version = "0.10.32" }
+tokio = { version = "1.0.0", features = ["full"] }
+tokio-stream = "0.1"
+parking_lot = "0.11"
+prost = "0.7.0"
+futures = "0.3.12"
+chrono = "0.4"
+bytes = "1.0.0"
+tracing = "0.1.22"
+tracing-subscriber = "0.2.15"
+protobuf = "2.20"
+
+[dependencies.tokio-util]
+version = "0.6.3"
+features = ["codec"]

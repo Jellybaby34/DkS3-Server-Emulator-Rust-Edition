@@ -40,18 +40,22 @@ impl LoginServer {
         info!("Now waiting for connections on <{}>", &addr);
 
         loop {
-            let accept_result = listener.accept().await;
-            if let Err(e) = accept_result {
-                info!("Accept failed with: {}", e);
-                continue;
-            }
+            let (stream, peer_addr) = match listener.accept().await {
+                Err(e) => {
+                    info!("Accept failed with: {}", e);
+                    continue;
+                },
+                Ok(result) => result
+            };
 
-            let (stream, peer_addr) = accept_result.unwrap();
             info!("New client from {}", peer_addr);
 
             let config = self.config.clone();
             let rsa_client = self.rsa_manager.clone();
 
+            tokio::spawn(async move {
+
+            });
             let fut_client = async move {
                 let mut client = LoginClient::new(peer_addr, stream, config, rsa_client).await;
                 client.process().await;

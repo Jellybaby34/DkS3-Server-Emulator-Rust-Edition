@@ -1,0 +1,18 @@
+[package]
+name = "dks3_proto"
+version = "0.1.0"
+authors = ["Gary Tierney <gary.tierney@fastmail.com>", "Jellybaby34 <Jellybaby34@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+bytes = "1.0"
+cwc = { git = "https://github.com/garyttierney/ds3-open-re" }
+prost = "0.7"
+thiserror = "1.0"
+
+[dependencies.tokio-util]
+version = "0.6.3"
+features = ["codec"]
+
+[build-dependencies]
+prost-build = "0.7"
