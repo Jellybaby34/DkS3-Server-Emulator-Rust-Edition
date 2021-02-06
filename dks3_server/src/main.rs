@@ -3,6 +3,7 @@ extern crate config;
 use tracing::{error, info};
 
 mod server;
+mod connection;
 
 use server::ServerMaster;
 

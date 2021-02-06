@@ -1,42 +1,57 @@
-use std::sync::Arc;
-use std::net::ToSocketAddrs;
+use parking_lot::RwLock;
 use std::io;
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::runtime;
-use parking_lot::RwLock;
 
 use tracing::{debug, error, info, span, trace, warn, Level};
 
-use crate::Config;
 use crate::server::rsa_manager::RsaManager;
+use crate::Config;
 mod login_client;
 use login_client::LoginClient;
 
 pub struct LoginServer {
     config: Arc<RwLock<Config>>,
     tokio_runtime: Arc<runtime::Runtime>,
-    rsa_manager: Arc<RwLock<RsaManager>>
+    rsa_manager: Arc<RwLock<RsaManager>>,
 }
 
 impl LoginServer {
-    pub fn new(config: Arc<RwLock<Config>>, tokio_runtime: Arc<runtime::Runtime>, rsa_manager: Arc<RwLock<RsaManager>>) -> LoginServer {
+    pub fn new(
+        config: Arc<RwLock<Config>>,
+        tokio_runtime: Arc<runtime::Runtime>,
+        rsa_manager: Arc<RwLock<RsaManager>>,
+    ) -> LoginServer {
         LoginServer {
             config,
             tokio_runtime,
-            rsa_manager
+            rsa_manager,
         }
     }
 
     pub async fn start(self) -> Result<(), std::io::Error> {
-        
         info!("Starting login server");
 
         // Parse host address and login port
-        let str_addr = self.config.read().get_server_ip().clone() + ":" + &self.config.read().get_login_port().to_string();
-        let mut addr = str_addr.to_socket_addrs().map_err(|e| io::Error::new(e.kind(), format!("{} is not a valid address", &str_addr)))?;
-        let addr = addr.next().ok_or_else(|| io::Error::new(io::ErrorKind::AddrNotAvailable, format!("{} is not a valid address", &str_addr)))?;
+        let str_addr = self.config.read().get_server_ip().clone()
+            + ":"
+            + &self.config.read().get_login_port().to_string();
+        let mut addr = str_addr.to_socket_addrs().map_err(|e| {
+            io::Error::new(e.kind(), format!("{} is not a valid address", &str_addr))
+        })?;
+        let addr = addr.next().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::AddrNotAvailable,
+                format!("{} is not a valid address", &str_addr),
+            )
+        })?;
 
-        let listener = TcpListener::bind(&addr).await.map_err(|e| io::Error::new(e.kind(), format!("Error binding to <{}>: {}", &addr, e))).unwrap();
+        let listener = TcpListener::bind(&addr)
+            .await
+            .map_err(|e| io::Error::new(e.kind(), format!("Error binding to <{}>: {}", &addr, e)))
+            .unwrap();
         info!("Now waiting for connections on <{}>", &addr);
 
         loop {
@@ -44,8 +59,8 @@ impl LoginServer {
                 Err(e) => {
                     info!("Accept failed with: {}", e);
                     continue;
-                },
-                Ok(result) => result
+                }
+                Ok(result) => result,
             };
 
             info!("New client from {}", peer_addr);
@@ -53,18 +68,14 @@ impl LoginServer {
             let config = self.config.clone();
             let rsa_client = self.rsa_manager.clone();
 
-            tokio::spawn(async move {
-
-            });
             let fut_client = async move {
                 let mut client = LoginClient::new(peer_addr, stream, config, rsa_client).await;
-                client.process().await;
+                client.run().await;
                 Ok(()) as io::Result<()>
             };
 
             self.tokio_runtime.spawn(fut_client);
         }
-
     }
 }
 

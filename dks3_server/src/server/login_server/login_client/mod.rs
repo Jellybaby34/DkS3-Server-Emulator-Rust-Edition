@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::default::Default;
 use std::fmt::Write;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,13 +12,16 @@ use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
-use tracing::{debug, error, info, Level, span, trace, warn};
+use tracing::{debug, error, info, span, trace, warn, Level};
 
 use dks3_proto::frame::FrameDecoder;
 use dks3_proto::msg::frpg2_request;
+use dks3_proto::msg::frpg2_request::RequestQueryLoginServerInfoResponse;
+use frpg2_request::RequestQueryLoginServerInfo;
 
-use crate::Config;
+use crate::connection::Connection;
 use crate::server::RsaManager;
+use crate::Config;
 
 // Packet header sizes in bytes
 pub const CLIENT_TO_SERVER_HEADER: u8 = 26;
@@ -31,10 +35,9 @@ pub struct LoginClientInfo {
 }
 
 pub struct LoginClient {
-    frame_reader: tokio_util::codec::FramedRead<io::ReadHalf<TcpStream>, FrameDecoder>,
+    connection: Connection,
     config: Arc<RwLock<Config>>,
     rsa_manager: Arc<RwLock<RsaManager>>,
-    channel_sender: mpsc::Sender<Vec<u8>>,
     client_info: LoginClientInfo,
 }
 
@@ -55,6 +58,25 @@ impl LoginClientSignalingInfo {
 }
 
 impl LoginClient {
+    pub async fn write_message<M: Message>(&mut self, message: M) {}
+
+    pub async fn read_message<M: Message + Default>(&mut self) -> M {
+        let frame = self.connection.read_frame().await.unwrap();
+
+        let mut payload_decrypted = BytesMut::new();
+        payload_decrypted.resize(256, 0);
+
+        let payload_length_decrypted = self
+            .rsa_manager
+            .read()
+            .rsa_decrypt(&frame.data, &mut payload_decrypted);
+
+        payload_decrypted.truncate(payload_length_decrypted);
+        let msg = M::decode(payload_decrypted).unwrap(); // TODO: handle error
+
+        msg
+    }
+
     pub async fn new(
         peer_addr: SocketAddr,
         stream: TcpStream,
@@ -62,81 +84,34 @@ impl LoginClient {
         rsa_manager: Arc<RwLock<RsaManager>>,
     ) -> LoginClient {
         let client_info = LoginClientInfo {
-            peer_addr: peer_addr,
+            peer_addr,
             steam_id_string: String::new(),
             client_game_version: 0,
             packet_counter: 0,
         };
 
-        let (channel_sender, mut channel_receiver) = mpsc::channel::<Vec<u8>>(32);
-        let (stream_reader, mut stream_writer) = io::split(stream);
-
-        let frame_reader = FramedRead::new(stream_reader, FrameDecoder::new(false));
-
-        let fut_sock_writer = async move {
-            while let Some(outgoing_packet) = channel_receiver.recv().await {
-                let _ = stream_writer.write_all(&outgoing_packet).await;
-            }
-            let _ = stream_writer.shutdown().await;
-        };
-
-        tokio::spawn(fut_sock_writer);
+        let (stream_reader, stream_writer) = io::split(stream);
+        let connection = Connection::start(stream_reader, stream_writer);
 
         LoginClient {
-            frame_reader,
+            connection,
             config,
             rsa_manager,
-            channel_sender,
             client_info,
         }
     }
 
-    ///// Command processing
-    pub async fn process(&mut self) {
-        loop {
-            let r = self.frame_reader.next().await;
+    pub async fn run(&mut self) {
+        let server_info_req = self.read_message::<RequestQueryLoginServerInfo>().await;
 
-            match r {
-                Some(Ok(frame)) => {
-                    let mut payload_decrypted = BytesMut::new();
-                    payload_decrypted.resize(256, 0);
+        /* Could check steam ID, versionnum, etc. here */
+        info!(
+            "Client connected with steamid {}, version {}",
+            server_info_req.steamid, server_info_req.versionnum
+        );
 
-                    let payload_length_decrypted = self.rsa_manager.read().rsa_decrypt(&frame.data, &mut payload_decrypted);
-
-                    let mut s = String::new();
-                    for i in 0..payload_length_decrypted {
-                        write!(&mut s, "{:02X} ", payload_decrypted[i]).expect("Unable to write")
-                    }
-                    println!("{}", s);
-
-                    payload_decrypted.truncate(payload_length_decrypted);
-                    let test = frpg2_request::RequestQueryLoginServerInfo::decode(payload_decrypted).unwrap();
-                    println!("{:?}", test);
-
-                    let _ = self.send_auth_server_info().await;
-                }
-                Some(Err(e)) => {
-                    error!("Error while decoding frame: {}", e);
-                    break;
-                }
-                None => {
-                    info!("Client disconnected");
-                    break;
-                }
-            }
-        }
-    }
-
-    async fn craft_header(&mut self) {}
-
-    async fn send_auth_server_info(&mut self) {
-        let mut server_info = frpg2_request::RequestQueryLoginServerInfoResponse::default();
+        let mut server_info: RequestQueryLoginServerInfoResponse = Default::default();
         server_info.serverip = self.config.read().get_server_ip().to_string();
         server_info.port = self.config.read().get_auth_port() as i64;
-        println!("Server IP: {}", server_info.serverip);
-        let mut payload = BytesMut::with_capacity(server_info.encoded_len());
-        server_info.encode(&mut payload).unwrap();
-        println!("Len: {}", payload.len());
     }
 }
-
