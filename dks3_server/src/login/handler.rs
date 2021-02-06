@@ -1,20 +1,17 @@
-use std::collections::{HashMap, HashSet};
 use std::default::Default;
-use std::fmt::Write;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use bytes::{Buf, Bytes, BytesMut};
-use futures::StreamExt;
-use parking_lot::{Mutex, RwLock};
+use bytes::BytesMut;
+use parking_lot::RwLock;
 use prost::Message;
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+use tokio::io;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tokio_util::codec::FramedRead;
+
 use tracing::{debug, error, info, span, trace, warn, Level};
 
-use dks3_proto::frame::{Frame, FrameDecoder};
+use dks3_proto::frame::Frame;
 use dks3_proto::msg::frpg2_request;
 use dks3_proto::msg::frpg2_request::RequestQueryLoginServerInfoResponse;
 use frpg2_request::RequestQueryLoginServerInfo;
@@ -23,56 +20,29 @@ use crate::connection::Connection;
 use crate::server::RsaManager;
 use crate::Config;
 
-// Packet header sizes in bytes
-pub const CLIENT_TO_SERVER_HEADER: u8 = 26;
-pub const SERVER_TO_CLIENT_HEADER: u8 = 0;
-
-pub struct LoginClientInfo {
-    pub peer_addr: SocketAddr,
-    pub steam_id_string: String,
-    pub client_game_version: u64,
-    pub packet_counter: u32,
-}
-
-pub struct LoginClient {
+pub struct LoginConnectionHandler {
     connection: Connection,
     global_counter: u16,
     counter: u32,
-    config: Arc<RwLock<Config>>,
-    rsa_manager: Arc<RwLock<RsaManager>>,
-    client_info: LoginClientInfo,
+    config: Config,
+    rsa_manager: RsaManager,
 }
 
-pub struct LoginClientSignalingInfo {
-    pub channel: mpsc::Sender<Vec<u8>>,
-    pub addr_p2p: [u8; 4],
-    pub port_p2p: u16,
-}
-
-impl LoginClientSignalingInfo {
-    pub fn new(channel: mpsc::Sender<Vec<u8>>) -> LoginClientSignalingInfo {
-        LoginClientSignalingInfo {
-            channel,
-            addr_p2p: [0; 4],
-            port_p2p: 0,
-        }
-    }
-}
-
-impl LoginClient {
+impl LoginConnectionHandler {
     pub async fn write_message<M: Message>(&mut self, message: M) {
         let message_len = message.encoded_len();
         let mut message_data = BytesMut::with_capacity(message_len);
 
-        message.encode(&mut message_data);
+        // TODO: handle error
+        let _ = message.encode(&mut message_data);
 
         let mut message_encrypted = BytesMut::new();
         message_encrypted.reserve(1024);
 
         let message_encrypted_len = self
             .rsa_manager
-            .read()
             .rsa_encrypt(&message_data, &mut message_encrypted);
+
         message_encrypted.truncate(message_encrypted_len);
 
         self.connection
@@ -92,7 +62,6 @@ impl LoginClient {
 
         let payload_length_decrypted = self
             .rsa_manager
-            .read()
             .rsa_decrypt(&frame.data, &mut payload_decrypted);
 
         payload_decrypted.truncate(payload_length_decrypted);
@@ -104,29 +73,20 @@ impl LoginClient {
         msg
     }
 
-    pub async fn new(
-        peer_addr: SocketAddr,
+    pub fn new(
         stream: TcpStream,
-        config: Arc<RwLock<Config>>,
-        rsa_manager: Arc<RwLock<RsaManager>>,
-    ) -> LoginClient {
-        let client_info = LoginClientInfo {
-            peer_addr,
-            steam_id_string: String::new(),
-            client_game_version: 0,
-            packet_counter: 0,
-        };
-
+        config: Config,
+        rsa_manager: RsaManager,
+    ) -> LoginConnectionHandler {
         let (stream_reader, stream_writer) = io::split(stream);
         let connection = Connection::start(stream_reader, stream_writer);
 
-        LoginClient {
+        LoginConnectionHandler {
             connection,
             global_counter: 0,
             counter: 0,
             config,
             rsa_manager,
-            client_info,
         }
     }
 
@@ -140,8 +100,8 @@ impl LoginClient {
         );
 
         let mut server_info: RequestQueryLoginServerInfoResponse = Default::default();
-        server_info.serverip = self.config.read().get_server_ip().to_string();
-        server_info.port = self.config.read().get_auth_port() as i64;
+        server_info.serverip = self.config.get_server_ip().to_string();
+        server_info.port = self.config.get_auth_port() as i64;
 
         self.write_message(server_info).await;
     }

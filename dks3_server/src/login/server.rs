@@ -1,32 +1,25 @@
-use parking_lot::RwLock;
+use std::clone::Clone;
 use std::io;
 use std::net::ToSocketAddrs;
-use std::sync::Arc;
+
+use parking_lot::RwLock;
 use tokio::net::TcpListener;
 use tokio::runtime;
-
 use tracing::{debug, error, info, span, trace, warn, Level};
 
-use crate::server::rsa_manager::RsaManager;
+use super::LoginConnectionHandler;
+use crate::server::RsaManager;
 use crate::Config;
-mod login_client;
-use login_client::LoginClient;
 
 pub struct LoginServer {
-    config: Arc<RwLock<Config>>,
-    tokio_runtime: Arc<runtime::Runtime>,
-    rsa_manager: Arc<RwLock<RsaManager>>,
+    config: Config,
+    rsa_manager: RsaManager,
 }
 
 impl LoginServer {
-    pub fn new(
-        config: Arc<RwLock<Config>>,
-        tokio_runtime: Arc<runtime::Runtime>,
-        rsa_manager: Arc<RwLock<RsaManager>>,
-    ) -> LoginServer {
+    pub fn new(config: Config, rsa_manager: RsaManager) -> LoginServer {
         LoginServer {
             config,
-            tokio_runtime,
             rsa_manager,
         }
     }
@@ -35,9 +28,8 @@ impl LoginServer {
         info!("Starting login server");
 
         // Parse host address and login port
-        let str_addr = self.config.read().get_server_ip().clone()
-            + ":"
-            + &self.config.read().get_login_port().to_string();
+        let str_addr =
+            self.config.get_server_ip().clone() + ":" + &self.config.get_login_port().to_string();
         let mut addr = str_addr.to_socket_addrs().map_err(|e| {
             io::Error::new(e.kind(), format!("{} is not a valid address", &str_addr))
         })?;
@@ -68,13 +60,12 @@ impl LoginServer {
             let config = self.config.clone();
             let rsa_client = self.rsa_manager.clone();
 
-            let fut_client = async move {
-                let mut client = LoginClient::new(peer_addr, stream, config, rsa_client).await;
+            tokio::spawn(async move {
+                let mut client = LoginConnectionHandler::new(stream, config, rsa_client);
+
                 client.run().await;
                 Ok(()) as io::Result<()>
-            };
-
-            self.tokio_runtime.spawn(fut_client);
+            });
         }
     }
 }

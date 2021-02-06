@@ -1,12 +1,20 @@
 extern crate config;
+extern crate tokio;
 
+use std::clone::Clone;
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 use tracing::{error, info};
 
-mod server;
+use crate::login::LoginServer;
+use crate::server::RsaManager;
+
 mod connection;
+mod login;
+mod server;
 
-use server::ServerMaster;
-
+#[derive(Clone)]
 pub struct Config {
     server_ip: String,
     login_port: u16,
@@ -18,36 +26,51 @@ pub struct Config {
 impl Config {
     pub fn new(config_file: config::Config) -> Config {
         Config {
-            server_ip: config_file.get_str("server_ip").expect("Could not read server_ip from config file"),
-            login_port: config_file.get_int("login_port").expect("Could not read login_port from config file") as u16,
-            auth_port: config_file.get_int("auth_port").expect("Could not read auth_port from config file") as u16,
-            game_port: config_file.get_int("game_port").expect("Could not read game_port from config file") as u16,
-            rsa_private_key: config_file.get_str("rsa_private_key").expect("Could not read rsa_private_key from config file"),
+            server_ip: config_file
+                .get_str("server_ip")
+                .expect("Could not read server_ip from config file"),
+            login_port: config_file
+                .get_int("login_port")
+                .expect("Could not read login_port from config file")
+                as u16,
+            auth_port: config_file
+                .get_int("auth_port")
+                .expect("Could not read auth_port from config file") as u16,
+            game_port: config_file
+                .get_int("game_port")
+                .expect("Could not read game_port from config file") as u16,
+            rsa_private_key: config_file
+                .get_str("rsa_private_key")
+                .expect("Could not read rsa_private_key from config file"),
         }
     }
 
     pub fn get_server_ip(&self) -> &String {
-        return &self.server_ip;
+        &self.server_ip
     }
 
     pub fn get_login_port(&self) -> u16 {
-        return self.login_port;
+        self.login_port
     }
 
     pub fn get_auth_port(&self) -> u16 {
-        return self.auth_port;
+        self.auth_port
     }
 
     pub fn get_game_port(&self) -> u16 {
-        return self.game_port;
+        self.game_port
     }
 
     pub fn get_rsa_private_key(&self) -> &String {
-        return &self.rsa_private_key;
+        &self.rsa_private_key
     }
 }
 
-fn main() {
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[tokio::main]
+async fn main() -> Result<()> {
     // Set up logging things
     // Should really add the module that logs to file
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
@@ -56,7 +79,8 @@ fn main() {
         .with_target(true)
         .with_ansi(true)
         .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed!");
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Setting default subscriber failed!");
 
     info!("Starting Dark Souls 3 Server Emulator");
     info!("Written by /u/TheSpicyChef");
@@ -65,19 +89,12 @@ fn main() {
     // Read config settings from the "Settings.toml" file
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
-    let config_inst = Config::new(settings);
+    let config = Config::new(settings);
 
-    // Create our "ServerMaster" instance that will start and handle the other instances
-    let server_inst = ServerMaster::new(config_inst);
+    let rsa_manager = RsaManager::new(config.clone());
+    let login_server = LoginServer::new(config.clone(), rsa_manager);
 
-    // Start the ServerMaster and block on it.
-    let tokio = server_inst.tokio_runtime.clone();
-    let res = tokio.block_on(server_inst.start());
+    tokio::try_join!(login_server.start())?;
 
-    if let Err(e) = res {
-        error!("Server terminated with error: {}", e);
-    } else {
-        error!("Server terminated normally");
-    }
-
+    Ok(())
 }

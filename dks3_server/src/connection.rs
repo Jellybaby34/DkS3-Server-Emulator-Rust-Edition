@@ -1,5 +1,3 @@
-use std::iter::Iterator;
-
 use futures::SinkExt;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{broadcast, mpsc};
@@ -27,7 +25,7 @@ impl Connection {
         let mut frame_reader = FramedRead::new(reader, FrameDecoder::new(false));
         let mut frame_writer = FramedWrite::new(writer, FrameEncoder::new(true));
 
-        let io_task = tokio::spawn(async move {
+        let _io_task = tokio::spawn(async move {
             loop {
                 tokio::select! {
                     inbound_frame = frame_reader.next() => {
