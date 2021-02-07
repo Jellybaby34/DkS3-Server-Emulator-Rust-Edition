@@ -47,7 +47,7 @@ pub fn decrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
     match mode {
         CipherMode::Rsa(key, padding) => {
             let mut decrypted_data = BytesMut::with_capacity(key.size() as usize);
-            decrypted_data.resize(256, 0);
+            decrypted_data.resize(key.size() as usize, 0);
 
             let decrypted_len = key
                 .private_decrypt(input, &mut decrypted_data, *padding)

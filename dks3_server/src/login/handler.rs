@@ -28,6 +28,8 @@ impl LoginConnectionHandler {
         let message_len = message.encoded_len();
         let mut message_data = BytesMut::with_capacity(message_len);
 
+        message.encode(&mut message_data);
+
         self.connection
             .write_frame(Frame::new(self.global_counter, self.counter, message_data))
             .await;
@@ -65,8 +67,8 @@ impl LoginConnectionHandler {
         info!(steamid = %server_info_req.steamid, version = %server_info_req.versionnum, "Client connected");
 
         let mut server_info = RequestQueryLoginServerInfoResponse::default();
-        server_info.serverip = self.config.get_server_ip().to_string();
-        server_info.port = 50000;
+        server_info.serverip = self.config.server_ip.to_string();
+        server_info.port = self.config.auth_port as i64;
 
         self.write_message(server_info).await;
 
