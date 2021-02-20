@@ -13,18 +13,14 @@ use crate::Config;
 
 pub struct LoginServer {
     config: Config,
-    rsa_manager: RsaManager,
 }
 
 impl LoginServer {
-    pub fn new(config: Config, rsa_manager: RsaManager) -> LoginServer {
-        LoginServer {
-            config,
-            rsa_manager,
-        }
+    pub fn new(config: Config) -> LoginServer {
+        LoginServer { config }
     }
 
-    pub async fn start(self) -> Result<(), std::io::Error> {
+    pub async fn run(self) -> Result<(), std::io::Error> {
         info!("Starting login server");
 
         // Parse host address and login port

@@ -4,15 +4,22 @@ extern crate tokio;
 use std::clone::Clone;
 
 use tracing::{error, info};
+use tracing_subscriber::layer::SubscriberExt;
 
+use crate::auth::AuthServer;
+use crate::context::MatchmakingDb;
 use crate::login::LoginServer;
+use crate::net::server::TcpServer;
 use crate::server::RsaManager;
 
+mod auth;
+mod context;
 mod login;
 mod net;
 mod server;
+mod service;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     server_ip: String,
     login_port: u16,
@@ -67,7 +74,7 @@ impl Config {
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     // Set up logging things
     // Should really add the module that logs to file
@@ -88,11 +95,12 @@ async fn main() -> Result<()> {
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
     let config = Config::new(settings);
+    let db = MatchmakingDb::new(config);
 
-    let rsa_manager = RsaManager::new(config.clone());
-    let login_server = LoginServer::new(config.clone(), rsa_manager);
+    let mut auth_service = service::auth::create_auth_service(&db);
+    let mut login_service = service::login::create_login_service(&db);
 
-    tokio::try_join!(login_server.start())?;
+    tokio::try_join!(login_service.run(), auth_service.run())?;
 
     Ok(())
 }

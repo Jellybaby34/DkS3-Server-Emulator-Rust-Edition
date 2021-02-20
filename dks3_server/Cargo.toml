@@ -5,23 +5,28 @@ authors = ["Gary Tierney <gary.tierney@fastmail.com>", "Jellybaby34 <Jellybaby34
 edition = "2018"
 
 [dependencies]
+aead = "0.3"
+async-trait = "0.1"
+block-cipher = "0.8"
+bytes = "1.0.0"
+chrono = "0.4"
 config = "0.10"
 cwc = { git = "https://github.com/garyttierney/ds3-open-re" }
-aead = "0.3"
-block-cipher = "0.8"
 dks3_proto = { path = "../dks3_proto" }
+futures = "0.3.12"
+mt19937 = "2.0"
 openssl = { version = "0.10.32" }
-tokio = { version = "1.0.0", features = ["full"] }
-tokio-stream = "0.1"
+opentelemetry-jaeger = { version = "0.11", features = ["collector_client", "reqwest_collector_client"] }
 parking_lot = "0.11"
 prost = "0.7.0"
-futures = "0.3.12"
-chrono = "0.4"
-bytes = "1.0.0"
-thiserror = "1.0"
-tracing = "0.1.22"
-tracing-subscriber = "0.2.15"
 protobuf = "2.20"
+rand = "0.8"
+thiserror = "1.0"
+tokio = { version = "1.0.0", features = ["full"] }
+tokio-stream = "0.1"
+tracing = "0.1.22"
+tracing-opentelemetry = "0.11"
+tracing-subscriber = "0.2.15"
 
 [dependencies.tokio-util]
 version = "0.6.3"

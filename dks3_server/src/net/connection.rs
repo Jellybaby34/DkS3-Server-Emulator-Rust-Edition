@@ -8,6 +8,7 @@ use tracing::info;
 
 use dks3_proto::frame::{CipherMode, Frame, FrameDecoder, FrameEncoder};
 use std::fmt::Debug;
+use std::time::Duration;
 
 pub struct Connection {
     close_tx: broadcast::Sender<()>,
