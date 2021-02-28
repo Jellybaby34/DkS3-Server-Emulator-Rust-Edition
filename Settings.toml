@@ -1,7 +1,7 @@
-server_ip = "0.0.0.0"
+server_ip = "127.0.0.1"
 login_port = 50050
-auth_port = 0
-game_port = 0
+auth_port = 50000
+game_port = 50001
 
 rsa_private_key = """-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC5MrCdebqKG8WD

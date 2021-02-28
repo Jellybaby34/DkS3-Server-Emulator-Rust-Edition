@@ -6,17 +6,11 @@ use std::clone::Clone;
 use tracing::{error, info};
 use tracing_subscriber::layer::SubscriberExt;
 
-use crate::auth::AuthServer;
 use crate::context::MatchmakingDb;
-use crate::login::LoginServer;
 use crate::net::server::TcpServer;
-use crate::server::RsaManager;
 
-mod auth;
 mod context;
-mod login;
 mod net;
-mod server;
 mod service;
 
 #[derive(Clone, Debug)]
@@ -88,8 +82,7 @@ async fn main() -> Result<()> {
         .expect("Setting default subscriber failed!");
 
     info!("Starting Dark Souls 3 Server Emulator");
-    info!("Written by /u/TheSpicyChef");
-    info!("Don't expect perfection because i've never used rust before :lmao:");
+    info!("Written by Sfix and TheSpicyChef");
 
     // Read config settings from the "Settings.toml" file
     let mut settings = config::Config::default();

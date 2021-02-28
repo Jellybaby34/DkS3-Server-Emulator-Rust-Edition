@@ -13,6 +13,8 @@ use crate::net::server::{ConnectionHandler, TcpServer};
 use crate::net::Connection;
 use crate::Config;
 
+use tracing::{error, info};
+
 pub struct AuthConnectionHandler {
     global_counter: u16,
     counter: u32,
@@ -29,7 +31,9 @@ impl Default for AuthConnectionHandler {
 
 // @TODO: this code might be able to be shifted into [Connection]
 impl AuthConnectionHandler {
-    async fn write_data(&mut self, conn: &mut Connection, data: &[u8]) {}
+    async fn write_data(&mut self, conn: &mut Connection, data: &[u8]) {
+        net::message::write_data(conn, data, self.global_counter, self.counter).await
+    }
 
     async fn write_message<M: Message>(&mut self, conn: &mut Connection, message: M) {
         net::message::write_message(conn, message, self.global_counter, self.counter).await
@@ -53,7 +57,7 @@ impl ConnectionHandler<MatchmakingDb> for AuthConnectionHandler {
 
     async fn run(&mut self, conn: &mut Connection, db: MatchmakingDb) {
         let handshake = self.read_message::<RequestHandshake>(conn).await;
-        let cwc_key = handshake.aescwckey.as_bytes();
+        let cwc_key = handshake.aescwckey.as_slice();
 
         conn.change_cipher_mode(CipherMode::aes128_cwc(cwc_key))
             .await;

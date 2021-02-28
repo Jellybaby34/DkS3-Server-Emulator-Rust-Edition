@@ -8,15 +8,14 @@
             "name": "(Windows) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/target/debug/dks3_server_emulator_rust",
+            "program": "${workspaceFolder}/target/debug/dks3_server",
             "windows": {
-              "program": "${workspaceFolder}/target/debug/dks3_server_emulator_rust.exe"
+              "program": "${workspaceFolder}/target/debug/dks3_server.exe"
             },
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "externalConsole": false
         }
     ]
 }

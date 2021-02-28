@@ -17,7 +17,7 @@ message RequestQueryLoginServerInfoResponse {
 }
 
 message RequestHandshake {
-  required string aescwckey = 1;
+  required bytes aescwckey = 1;
 }
 
 message RequestHandshakeResponse {
