@@ -92,8 +92,9 @@ pub fn encrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
             Ok(encrypted_data)
         }
         CipherMode::Cwc(key) => {
-            let mut iv = Nonce::from(rand::thread_rng().gen::<[u8; 11]>());
+            let iv = Nonce::from(rand::thread_rng().gen::<[u8; 11]>());
             let mut data = Vec::with_capacity(11 + 16 + input.len());
+            unsafe { data.set_len(11 + 16 + input.len()) };
             data[0..11].copy_from_slice(iv.as_slice());
             data[11 + 16..].copy_from_slice(input);
 
