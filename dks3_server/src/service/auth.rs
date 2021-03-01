@@ -59,16 +59,16 @@ impl ConnectionHandler<MatchmakingDb> for AuthConnectionHandler {
         let handshake = self.read_message::<RequestHandshake>(conn).await;
         let cwc_key = handshake.aescwckey.as_slice();
 
+        info!("key = {}", hex::encode(cwc_key));
+
         conn.change_cipher_mode(CipherMode::aes128_cwc(cwc_key))
             .await;
 
-        // Generate random 11 bytes, used as IV for CWC cipher on the client?
-        let mut iv = rand::thread_rng().gen::<[u8; 11]>().to_vec();
-        iv.resize(27, 0);
-
-        self.write_data(conn, &iv).await;
+        let init_block = [0u8; 16];
+        self.write_data(conn, &init_block).await;
 
         let status_req = self.read_message::<GetServiceStatus>(conn).await;
+        info!("steamid {}", status_req.steamid);
     }
 }
 

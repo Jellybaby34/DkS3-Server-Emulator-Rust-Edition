@@ -5,16 +5,11 @@ use dks3_proto::frame::Frame;
 
 use crate::net::Connection;
 
-pub async fn write_data(
-    conn: &mut Connection,
-    data: &[u8],
-    global_counter: u16,
-    counter: u32
-) {
+pub async fn write_data(conn: &mut Connection, data: &[u8], global_counter: u16, counter: u32) {
     let data_buffer = bytes::BytesMut::from(data);
-    
+
     conn.write_frame(Frame::new(global_counter, counter, data_buffer))
-    .await;
+        .await;
 }
 
 pub async fn write_message<M: Message>(
@@ -26,7 +21,9 @@ pub async fn write_message<M: Message>(
     let message_len = message.encoded_len();
     let mut message_data = BytesMut::with_capacity(message_len);
 
-    message.encode(&mut message_data);
+    message
+        .encode(&mut message_data)
+        .expect("Unable to write data");
 
     conn.write_frame(Frame::new(global_counter, counter, message_data))
         .await;

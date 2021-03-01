@@ -1,10 +1,14 @@
-use openssl::pkey::Private;
-use openssl::rsa::{Padding, Rsa};
+use std::fmt::{Debug, Formatter};
 
-use aead::{Aead, Error, NewAead, Nonce, Payload};
+use aead::{Aead, AeadInPlace, Error, NewAead, Nonce, Payload, Tag};
+use block_cipher::{Block, BlockCipher, NewBlockCipher};
+
 use bytes::BytesMut;
 use cwc::Aes128Cwc;
-use std::fmt::{Debug, Formatter};
+use openssl::pkey::Private;
+use openssl::rsa::{Padding, Rsa};
+use rand::Rng;
+use tracing::info;
 
 #[derive(Clone)]
 pub enum CipherMode {
@@ -15,8 +19,8 @@ pub enum CipherMode {
 impl Debug for CipherMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            CipherMode::Rsa(_, _) => write!(f, "Rsa"),
-            CipherMode::Cwc(_) => write!(f, "Cwc"),
+            CipherMode::Rsa(_, _) => write!(f, "Rsa")?,
+            CipherMode::Cwc(_) => write!(f, "Cwc")?,
         };
 
         Ok(())
@@ -61,12 +65,15 @@ pub fn decrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
             let tag = &input[11..27];
             let data = &input[27..];
 
-            let mut payload = Payload::from(data);
-            payload.aad = tag;
+            let mut plaintext = Vec::from(data);
+            key.decrypt_in_place_detached(
+                Nonce::from_slice(nonce),
+                nonce,
+                &mut plaintext,
+                Tag::from_slice(tag),
+            )?;
 
-            let decrypted_data = key.decrypt(Nonce::from_slice(nonce), payload)?;
-
-            Ok(BytesMut::from(&decrypted_data[..]))
+            Ok(BytesMut::from(&plaintext[..]))
         }
     }
 }
@@ -85,7 +92,15 @@ pub fn encrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
             Ok(encrypted_data)
         }
         CipherMode::Cwc(key) => {
-            unimplemented!()
+            let mut iv = Nonce::from(rand::thread_rng().gen::<[u8; 11]>());
+            let mut data = Vec::with_capacity(11 + 16 + input.len());
+            data[0..11].copy_from_slice(iv.as_slice());
+            data[11 + 16..].copy_from_slice(input);
+
+            let tag = key.encrypt_in_place_detached(&iv, iv.as_slice(), &mut data[11 + 16..])?;
+            data[11..11 + 16].copy_from_slice(tag.as_slice());
+
+            Ok(BytesMut::from(&data[..]))
         }
     }
 }

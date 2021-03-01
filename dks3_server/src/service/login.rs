@@ -11,6 +11,7 @@ use crate::context::MatchmakingDb;
 use crate::net::server::{ConnectionHandler, TcpServer};
 use crate::net::Connection;
 use crate::{net, Config};
+use std::time::Duration;
 
 pub struct LoginConnectionHandler {
     global_counter: u16,
@@ -60,6 +61,8 @@ impl ConnectionHandler<MatchmakingDb> for LoginConnectionHandler {
         };
 
         self.write_message(conn, server_info).await;
+
+        tokio::time::sleep(Duration::from_millis(2000)).await;
     }
 }
 

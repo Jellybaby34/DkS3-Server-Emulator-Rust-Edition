@@ -7,11 +7,18 @@ edition = "2018"
 [dependencies]
 bytes = "1.0"
 aead = "0.3"
-cwc = { git = "https://github.com/garyttierney/ds3-open-re" }
-openssl = { version = "0.10.32" }
+hex = "0.4"
+openssl = { version = "0.10", features = [] }
 prost = "0.7"
+rand = "0.8"
+block-cipher = "0.8"
 thiserror = "1.0"
 tracing = "0.1"
+
+[dependencies.cwc]
+git = "https://github.com/garyttierney/ds3-open-re"
+features = ["aes-mode", "from-software"]
+
 [dependencies.tokio-util]
 version = "0.6.3"
 features = ["codec"]

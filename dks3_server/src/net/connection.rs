@@ -41,14 +41,14 @@ impl Connection {
                     cipher = cipher_change_rx.recv() => {
                         match cipher {
                             Some(cipher) => {
-//                                info!("Cipher change");
+                               info!("Cipher change");
                                 let new_cipher = cipher;
                                 frame_reader.decoder_mut().set_cipher_mode(new_cipher.clone());
                                 frame_writer.encoder_mut().set_cipher_mode(new_cipher.clone());
                             }
                             None => {
-//                                info!("Cipher channel closed");
-//                                break;
+                              info!("Cipher channel closed");
+                              break;
                             }
                         }
                     }
