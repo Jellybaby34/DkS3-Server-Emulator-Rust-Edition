@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use prost::Message;
 use rand::Rng;
+use bytes::BufMut;
 
 use dks3_proto::frame::CipherMode;
 use dks3_proto::msg::frpg2_request::{
@@ -33,6 +34,15 @@ impl Default for AuthConnectionHandler {
 impl AuthConnectionHandler {
     async fn write_data(&mut self, conn: &mut Connection, data: &[u8]) {
         net::message::write_data(conn, data, self.global_counter, self.counter).await
+    }
+
+    async fn read_data(&mut self, conn: &mut Connection) -> bytes::BytesMut {
+        let (data, global_counter, counter) = net::message::read_data(conn).await;
+
+        self.global_counter = global_counter;
+        self.counter = counter;
+
+        data
     }
 
     async fn write_message<M: Message>(&mut self, conn: &mut Connection, message: M) {
@@ -69,6 +79,40 @@ impl ConnectionHandler<MatchmakingDb> for AuthConnectionHandler {
 
         let status_req = self.read_message::<GetServiceStatus>(conn).await;
         info!("steamid {}", status_req.steamid);
+
+        let status_response = GetServiceStatusResponse {
+            id: 2,
+            steamid: "\x00".to_string(),
+            unknownfield: 0,
+            versionnum: 0,
+        };
+
+        self.write_message(conn, status_response).await;
+
+        // Some kind of exchange between client/server
+        // Client sends 8 bytes, server adds another 8 bytes then resends it
+        // ?key exchange for something
+        let mut unknown_16bytes = bytes::BytesMut::with_capacity(16);
+        let client_8bytes = self.read_data(conn).await;
+        unknown_16bytes.put(&client_8bytes[..]);
+        let server_8bytes = rand::thread_rng().gen::<[u8; 8]>();
+        unknown_16bytes.put(&server_8bytes[..]);
+
+        info!("unknown16bytes = {}", hex::encode(&unknown_16bytes));
+        self.write_data(conn, &unknown_16bytes[..]).await;
+
+        // Here the client sends us their steam session ticket
+        // We could try and validate it but the only struct I could find as a guide
+        // is 8+ years old and is only good for a rough guide
+        // https://github.com/SteamRE/SteamKit/blob/master/Resources/Structs/steam3_appticket.hsl
+        // Size is 268 bytes (0x10C)
+        let steam_ticket = self.read_data(conn).await;
+
+        let mut ticket_steamid = [0u8; 8];
+        ticket_steamid.copy_from_slice(&steam_ticket[28..36]);
+        ticket_steamid.reverse();
+        info!("Status req steamid: {}, ticket steamid: {}", status_req.steamid, hex::encode(ticket_steamid));
+
     }
 }
 

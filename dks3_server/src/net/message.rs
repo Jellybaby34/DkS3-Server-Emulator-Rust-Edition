@@ -12,6 +12,12 @@ pub async fn write_data(conn: &mut Connection, data: &[u8], global_counter: u16,
         .await;
 }
 
+pub async fn read_data(conn: &mut Connection) -> (BytesMut, u16, u32) {
+    let frame = conn.read_frame().await.unwrap();
+
+    (frame.data, frame.global_counter, frame.counter)
+}
+
 pub async fn write_message<M: Message>(
     conn: &mut Connection,
     message: M,
