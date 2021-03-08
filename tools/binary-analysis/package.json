@@ -1,0 +1,14 @@
+{
+  "name": "binary-analysis",
+  "version": "1.0.0",
+  "devDependencies": {
+    "@types/frida-gum": "^16.2.0",
+    "@types/node": "^14.14.10",
+    "frida-compile": "^10.0.0"
+  },
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "frida-compile agent/index.ts -o _agent.js -c",
+    "watch": "frida-compile agent/index.ts -o _agent.js -w"
+  }
+}
