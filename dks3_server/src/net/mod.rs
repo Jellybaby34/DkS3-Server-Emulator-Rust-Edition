@@ -1,4 +1,5 @@
 pub use connection::Connection;
+pub use connection::UdpConnection;
 pub use dks3_proto::frame::CipherMode;
 
 mod connection;

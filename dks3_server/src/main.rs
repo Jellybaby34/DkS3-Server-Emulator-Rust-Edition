@@ -7,11 +7,13 @@ use tracing::{error, info};
 use tracing_subscriber::layer::SubscriberExt;
 
 use crate::context::MatchmakingDb;
-use crate::net::server::TcpServer;
+use crate::context::ConnectionDb;
+use crate::net::server::{TcpServer, UdpServer};
 
 mod context;
 mod net;
 mod service;
+
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -83,17 +85,20 @@ async fn main() -> Result<()> {
 
     info!("Starting Dark Souls 3 Server Emulator");
     info!("Written by Sfix and TheSpicyChef");
+    info!("Version 0.0.1");
 
     // Read config settings from the "Settings.toml" file
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
     let config = Config::new(settings);
-    let db = MatchmakingDb::new(config);
+    let db = MatchmakingDb::new(config.clone());
+    let conn_db = ConnectionDb::new(config.clone());
 
     let mut auth_service = service::auth::create_auth_service(&db);
     let mut login_service = service::login::create_login_service(&db);
+    let mut game_service = service::game::create_game_service(&db);
 
-    tokio::try_join!(login_service.run(), auth_service.run())?;
+    tokio::try_join!(login_service.run(), auth_service.run(), game_service.run())?;
 
     Ok(())
 }

@@ -13,14 +13,16 @@ use tracing::info;
 #[derive(Clone)]
 pub enum CipherMode {
     Rsa(Rsa<Private>, Padding),
-    Cwc(Aes128Cwc),
+    CwcTCP(Aes128Cwc),
+    CwcUDP(Aes128Cwc)
 }
 
 impl Debug for CipherMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             CipherMode::Rsa(_, _) => write!(f, "Rsa")?,
-            CipherMode::Cwc(_) => write!(f, "Cwc")?,
+            CipherMode::CwcTCP(_) => write!(f, "CwcTCP")?,
+            CipherMode::CwcUDP(_) => write!(f, "CwcUDP")?,
         };
 
         Ok(())
@@ -42,8 +44,12 @@ impl CipherMode {
         )
     }
 
-    pub fn aes128_cwc(key: &[u8]) -> Self {
-        CipherMode::Cwc(Aes128Cwc::new_varkey(key).expect("invalid key"))
+    pub fn aes128_cwc_tcp(key: &[u8]) -> Self {
+        CipherMode::CwcTCP(Aes128Cwc::new_varkey(key).expect("invalid key"))
+    }
+
+    pub fn aes128_cwc_udp(key: &[u8]) -> Self {
+        CipherMode::CwcUDP(Aes128Cwc::new_varkey(key).expect("invalid key"))
     }
 }
 
@@ -60,10 +66,28 @@ pub fn decrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
 
             Ok(decrypted_data)
         }
-        CipherMode::Cwc(key) => {
+        CipherMode::CwcTCP(key) => {
             let nonce = &input[0..11];
             let tag = &input[11..27];
             let data = &input[27..];
+
+            let mut plaintext = Vec::from(data);
+            key.decrypt_in_place_detached(
+                Nonce::from_slice(nonce),
+                nonce,
+                &mut plaintext,
+                Tag::from_slice(tag),
+            )?;
+
+            Ok(BytesMut::from(&plaintext[..]))
+        }
+        CipherMode::CwcUDP(key) => {
+            info!("CwcUDP not tested properly");
+
+            // Skip the first 8 bytes as they are the unique connection ID
+            let nonce = &input[8..19];
+            let tag = &input[19..35]; 
+            let data = &input[36..]; // Skip 1 byte between tag and payload as its used for something else
 
             let mut plaintext = Vec::from(data);
             key.decrypt_in_place_detached(
@@ -91,7 +115,7 @@ pub fn encrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
 
             Ok(encrypted_data)
         }
-        CipherMode::Cwc(key) => {
+        CipherMode::CwcTCP(key) => {
             let iv = Nonce::from(rand::thread_rng().gen::<[u8; 11]>());
             let mut data = Vec::with_capacity(11 + 16 + input.len());
             unsafe { data.set_len(11 + 16 + input.len()) };
@@ -102,6 +126,9 @@ pub fn encrypt(mode: &CipherMode, input: &[u8]) -> Result<BytesMut, Error> {
             data[11..11 + 16].copy_from_slice(tag.as_slice());
 
             Ok(BytesMut::from(&data[..]))
+        }
+        CipherMode::CwcUDP(key) => {
+            unimplemented!();
         }
     }
 }

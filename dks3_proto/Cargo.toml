@@ -16,7 +16,7 @@ thiserror = "1.0"
 tracing = "0.1"
 
 [dependencies.cwc]
-git = "https://github.com/garyttierney/ds3-open-re"
+path = "../cwc"
 features = ["aes-mode", "from-software"]
 
 [dependencies.tokio-util]

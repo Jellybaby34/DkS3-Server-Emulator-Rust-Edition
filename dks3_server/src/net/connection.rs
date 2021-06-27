@@ -18,6 +18,11 @@ pub struct Connection {
     handle: JoinHandle<()>,
 }
 
+pub struct UdpConnection {
+    id: u64,
+    handle: JoinHandle<()>,
+}
+
 impl Connection {
     pub fn start<Read>(cipher_pair: (CipherMode, CipherMode), stream: Read) -> Connection
     where
@@ -107,4 +112,26 @@ impl Connection {
     pub async fn write_frame(&self, frame: Frame) {
         let _ = self.outbound_frame_tx.send(frame).await;
     }
+}
+
+impl UdpConnection {
+    pub fn start<Read>(id: u64, cipher: CipherMode, stream: Read) -> UdpConnection
+    where
+        Read: AsyncRead + AsyncWrite + Unpin + Send + Debug + 'static,
+    {
+
+        let handle = tokio::spawn(async move {
+
+            loop {
+                tokio::time::sleep(Duration::from_millis(2000)).await;
+                info!("UDP conn loop");
+            }
+        });
+
+        UdpConnection {
+            id,
+            handle
+        }
+    }
+
 }
